@@ -254,11 +254,410 @@
 - Implement special methods appropriately
 - Use properties for computed attributes
 
+Here's a clear comparison between methods and properties:
+```python
+class Rectangle:
+    def __init__(self, width: float, height: float):
+        self._width = width
+        self._height = height
+    
+    # Method: Use when...
+    def calculate_area(self) -> float:
+        """
+        - Complex calculations
+        - Takes parameters
+        - Changes state
+        - Represents actions/behaviors
+        """
+        return self._width * self._height
+    
+    # Property: Use when...
+    @property
+    def area(self) -> float:
+        """
+        - Feels like data access
+        - No parameters needed
+        - Doesn't change state
+        - Represents attributes/state
+        """
+        return self._width * self._height
+
+# Method usage
+rect = Rectangle(10, 20)
+area1 = rect.calculate_area()  # Explicit call with ()
+print(f"Method call syntax: {area1}")
+
+# Property usage
+area2 = rect.area  # Looks like attribute access
+print(f"Property access syntax: {area2}")
+```
+
+
+Quick Decision Guide:
+```python
+# Use METHOD when:
+def do_something(self, arg1, arg2):  # Takes arguments
+    self.state_changes()              # Changes object state
+    expensive_calculation()           # Heavy computation
+    return complex_result            
+
+# Use PROPERTY when:
+@property
+def something(self):                 # No arguments
+    return self._x + self._y         # Simple computation
+    # or return self._cached_value   # Cached value
+```
+
+Properties are essentially methods that pretend to be attributes. Use them when you want the syntax of attribute access but need the control of a method.
+
 ### Namespace Management
 - Avoid polluting the global namespace
+
+```python
+# ❌ BAD: Global namespace pollution
+from datetime import *
+from pandas import *
+from numpy import *
+
+# Now we have conflicts and unclear origins
+array([1, 2, 3])  # numpy or pandas?
+now()  # which datetime function?
+
+MAGIC_NUMBER = 42  # floating in global scope
+def helper_function():  # utility floating in global scope
+    pass
+
+
+# ✅ GOOD: Controlled imports and scope
+import datetime as dt
+import numpy as np
+from pandas import DataFrame, Series
+
+# Clear origin of functions/classes
+np.array([1, 2, 3])
+dt.datetime.now()
+
+class Config:
+    """Constants contained in a class"""
+    MAGIC_NUMBER = 42
+
+def main():
+    """Utilities scoped in functions or classes"""
+    def helper_function():
+        pass
+    
+    # Use helper within its scope
+    helper_function()
+
+if __name__ == "__main__":
+    main()
+
+# ❌ BAD: Star imports in __init__.py
+# mypackage/__init__.py
+from .module1 import *
+from .module2 import *
+
+# ✅ GOOD: Explicit imports in __init__.py
+# mypackage/__init__.py
+from .module1 import specific_function
+from .module2 import SpecificClass
+
+# ❌ BAD: Module-level side effects
+# config.py
+print("Loading config...")  # Side effect on import
+DATABASE_URL = get_from_env()  # Side effect on import
+
+# ✅ GOOD: Lazy loading and initialization
+# config.py
+class Config:
+    @classmethod
+    def init(cls):
+        cls.DATABASE_URL = get_from_env()
+
+# Use when needed
+Config.init()
+```
+1. Key Principles:
+1. Use explicit imports
+1. Scope constants in classes
+1. Keep utilities in appropriate classes/functions
+1. Avoid module-level side effects
+1. Use if __name__ == "__main__": for script entry points
+
+
 - Use `__all__` to control exports
+
+Here's a detailed explanation of `__all__` with examples:
+```python
+# mymodule.py
+"""
+✅ GOOD: Explicitly define public API
+"""
+__all__ = [
+    'PublicClass',
+    'public_function',
+    'CONSTANT',
+]
+
+# Public items (included in __all__)
+CONSTANT = 42
+
+def public_function():
+    return "I'm public!"
+
+class PublicClass:
+    pass
+
+# Private items (not in __all__)
+_INTERNAL_CONSTANT = 100
+
+def _helper_function():
+    pass
+
+class _InternalClass:
+    pass
+
+
+# usage.py
+# ✅ GOOD: Only imports what's in __all__
+from mymodule import *
+# Now you only have access to: PublicClass, public_function, CONSTANT
+
+# ❌ BAD: No __all__ defined
+from another_module import *  # Imports everything not starting with _
+
+
+```
+
+
+Real-world Example:
+```python
+# api.py
+"""
+Common pattern in libraries/frameworks
+"""
+__all__ = [
+    # Core functionality
+    'Client',
+    'connect',
+    
+    # Exceptions
+    'APIError',
+    'ConnectionError',
+    
+    # Constants
+    'DEFAULT_TIMEOUT',
+    'API_VERSION',
+]
+
+class Client:
+    pass
+
+def connect():
+    pass
+
+class APIError(Exception):
+    pass
+
+class ConnectionError(Exception):
+    pass
+
+DEFAULT_TIMEOUT = 30
+API_VERSION = '1.0'
+
+# Internal stuff - not exported
+_connection_pool = {}
+def _validate_credentials():
+    pass
+```
+
+Key Points:
+1. `__all__` controls what's imported with `from module import *`
+1. Makes the public API explicit
+1. Best practice for library authors
+1. Doesn't affect explicit imports (from module import specific_thing)
+1. Helps with documentation generation
+
+
 - Maintain clear module boundaries
+
+Here's a guide to maintain clear module boundaries:
+```python
+# ❌ BAD: Mixed responsibilities
+# utils.py
+def parse_json(data): pass
+def send_email(to, subject): pass
+def calculate_tax(amount): pass
+def resize_image(img): pass
+def validate_user(user): pass
+
+# ✅ GOOD: Clear module boundaries
+# parsers.py
+class JSONParser:
+    def parse(self, data): pass
+
+# notifications.py
+class EmailService:
+    def send(self, to, subject): pass
+
+# finance/tax_calculator.py
+class TaxCalculator:
+    def calculate(self, amount): pass
+
+# image/processor.py
+class ImageProcessor:
+    def resize(self, img): pass
+
+# auth/validator.py
+class UserValidator:
+    def validate(self, user): pass
+```
+
+Example Project Structure:
+```
+myproject/
+├── core/
+│   ├── __init__.py
+│   ├── models.py      # Core data models
+│   └── exceptions.py  # Custom exceptions
+├── services/
+│   ├── __init__.py
+│   ├── auth.py       # Authentication logic
+│   └── payment.py    # Payment processing
+├── utils/
+│   ├── __init__.py
+│   ├── formatters.py # Data formatting
+│   └── validators.py # Input validation
+└── api/
+    ├── __init__.py
+    ├── routes.py     # API endpoints
+    └── schemas.py    # API data schemas
+```
+
+Key Principles:
+1. Single Responsibility: Each module has one clear purpose
+1. Encapsulation: Modules hide internal details
+1. Dependencies: Clear, one-way dependency flow
+1. Interface: Well-defined public APIs
+1. Cohesion: Related functionality stays together
+
+
+Example Usage:
+```python
+# ✅ GOOD: Clear dependencies
+from core.models import User
+from services.auth import AuthService
+from services.payment import PaymentProcessor
+
+class OrderManager:
+    def __init__(self):
+        self.auth = AuthService()
+        self.payment = PaymentProcessor()
+
+    def process_order(self, user: User, amount: float):
+        if self.auth.verify(user):
+            return self.payment.charge(amount)
+```
+
 - Use meaningful and consistent naming
+
+
+
+Here's a comprehensive guide to Python naming conventions and best practices:
+```python
+# ❌ BAD: Unclear or inconsistent naming
+def calc(x, y):
+    return x + y
+
+class data:
+    def get_the_thing(self): pass
+    def process(self): pass
+    def handle_stuff_with_other_things(self): pass
+
+my_l = [1, 2, 3]
+tmp = 42
+flag = True
+
+
+# ✅ GOOD: Clear, consistent, meaningful names
+def calculate_total(price: float, tax_rate: float) -> float:
+    return price * (1 + tax_rate)
+
+class OrderProcessor:
+    def get_order_status(self) -> str: pass
+    def process_payment(self) -> bool: pass
+    def handle_shipping_notification(self) -> None: pass
+
+prices = [1, 2, 3]
+max_retries = 42
+is_active = True
+```
+
+Naming Conventions:
+```python
+# Variables and Functions: lowercase_with_underscores
+user_id = 42
+def validate_email(email: str) -> bool: pass
+
+# Classes: PascalCase
+class UserAccount: pass
+class PaymentProcessor: pass
+
+# Constants: UPPERCASE_WITH_UNDERSCORES
+MAX_CONNECTIONS = 100
+DEFAULT_TIMEOUT = 30
+
+# Protected/Private: _single_leading_underscore
+class User:
+    def __init__(self):
+        self._password = None  # Protected
+        self.__secret = None   # Private (name mangling)
+
+# Special Methods: __double_underscores__
+def __init__(self): pass
+def __str__(self): pass
+
+# Type Variables: CapitalizedSingle
+from typing import TypeVar
+T = TypeVar('T')
+```
+
+
+
+Common Patterns:
+```python
+# Boolean variables/functions: is_, has_, can_, should_
+is_valid = True
+has_permission = False
+def is_authenticated(user): pass
+
+# Collections: plural nouns
+users = ['alice', 'bob']
+error_codes = {404, 500}
+price_mapping = {'basic': 10, 'premium': 20}
+
+# Callbacks/Handlers: _handler, _callback
+def on_click_handler(event): pass
+def data_received_callback(data): pass
+
+# Factory functions: create_, make_, build_
+def create_user(name): pass
+def make_request(url): pass
+
+# Context managers: with_ prefix
+@contextmanager
+def with_transaction(): pass
+```
+
+Best Practices:
+1. Be descriptive but concise
+1. Use technical terms correctly
+1. Be consistent across the codebase
+1. Avoid abbreviations unless very common
+1. Make names searchable
+1. Use opposites consistently (start/stop, open/close)
+
+
 
 ## Exercises and Examples
 
